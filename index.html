@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Multi-Tanda Tangan PDF Online</title>
+    <!-- Tailwind CSS untuk Desain -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PDF.js untuk Render PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+    <!-- pdf-lib untuk Memodifikasi/Menyimpan PDF -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- Interactor / Interact.js untuk Drag & Resize Tanda Tangan -->
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+</head>
+
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800">
+
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white shadow-md py-4 px-6 mb-6">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                ✍️ Multi-Tanda Tangan Dokumen PDF
+            </h1>
+            <span class="text-xs bg-indigo-500 py-1 px-3 rounded-full">100% Aman di Browser Anda</span>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 pb-12 grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+        <!-- Sidebar Kontrol -->
+        <div class="lg:col-span-1 bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-5 h-fit">
+            <h2 class="font-bold text-slate-700 text-lg border-b pb-2">Langkah-langkah</h2>
+
+            <!-- 1. Upload PDF -->
+            <div>
+                <label class="block text-sm font-semibold mb-2 text-slate-600">1. Unggah File PDF</label>
+                <input type="file" id="pdfFile" accept="application/pdf"
+                    class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 cursor-pointer">
+            </div>
+
+            <!-- 2. Upload TTD PNG -->
+            <div>
+                <label class="block text-sm font-semibold mb-2 text-slate-600">2. Unggah Gambar TTD (PNG)</label>
+                <input type="file" id="sigFile" accept="image/png, image/jpeg"
+                    class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 cursor-pointer">
+            </div>
+
+            <!-- Kontrol Halaman & Aksi Tambah TTD -->
+            <div id="pageControls" class="hidden flex flex-col gap-3 pt-3 border-t">
+                <label class="text-sm font-semibold text-slate-600">Navigasi Halaman</label>
+                <div class="flex items-center justify-between bg-slate-100 p-2 rounded-xl">
+                    <button id="prevPage"
+                        class="bg-white hover:bg-slate-200 px-3 py-1 rounded shadow-sm text-sm font-medium">‹</button>
+                    <span id="pageInfo" class="text-xs font-semibold text-slate-600">Hal 1 dari 1</span>
+                    <button id="nextPage"
+                        class="bg-white hover:bg-slate-200 px-3 py-1 rounded shadow-sm text-sm font-medium">›</button>
+                </div>
+
+                <button id="addSigToPageBtn"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-3 rounded-lg shadow transition">
+                    📌 Sematkan TTD di Halaman Ini
+                </button>
+
+                <p id="addedCount" class="text-[11px] text-slate-500 text-center font-medium">Total TTD disematkan: 0
+                </p>
+            </div>
+
+            <!-- Tombol Proses Akhir -->
+            <button id="saveBtn" disabled
+                class="w-full mt-3 bg-indigo-600 text-white font-semibold py-2.5 px-4 rounded-xl shadow hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Simpan & Unduh PDF Final
+            </button>
+        </div>
+
+        <!-- Area Kerja / Viewer PDF -->
+        <div
+            class="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center min-h-[500px] relative overflow-hidden">
+            <div id="placeholder" class="text-center text-slate-400">
+                <p class="text-lg font-medium">Belum ada file PDF yang dimuat</p>
+                <p class="text-sm">Silakan pilih file PDF melalui panel di sebelah kiri.</p>
+            </div>
+
+            <!-- Wrapper Container untuk Render PDF & TTD Overlay -->
+            <div id="pdfContainer"
+                class="relative shadow-lg hidden max-w-full overflow-auto border bg-slate-100 p-4 rounded-lg">
+                <canvas id="pdfCanvas" class="block"></canvas>
+
+                <!-- Kotak Tanda Tangan yang Bisa Digeser dan Diubah Ukurannya -->
+                <div id="signatureBox"
+                    class="absolute border-2 border-dashed border-indigo-500 bg-indigo-500/10 cursor-move hidden flex items-center justify-center select-none z-10"
+                    style="width: 150px; height: 75px; top: 50px; left: 50px;">
+                    <img id="sigImage" src="" alt="TTD" class="w-full h-full object-contain pointer-events-none">
+                    <div
+                        class="absolute -top-3 -right-3 bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded shadow pointer-events-none">
+                        Geser/Ubah</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Script Utama -->
+    <script>
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pageCount = 0;
+        let pdfBytes = null;
+        let signatureDataUrl = null;
+
+        // Array untuk menyimpan daftar tanda tangan di berbagai halaman
+        // Format: { pageNum, x, y, width, height }
+        let placedSignatures = [];
+
+        const pdfFileInput = document.getElementById('pdfFile');
+        const sigFileInput = document.getElementById('sigFile');
+        const pdfContainer = document.getElementById('pdfContainer');
+        const placeholder = document.getElementById('placeholder');
+        const canvas = document.getElementById('pdfCanvas');
+        const ctx = canvas.getContext('2d');
+        const signatureBox = document.getElementById('signatureBox');
+        const sigImage = document.getElementById('sigImage');
+        const pageControls = document.getElementById('pageControls');
+        const pageInfo = document.getElementById('pageInfo');
+        const saveBtn = document.getElementById('saveBtn');
+        const addSigToPageBtn = document.getElementById('addSigToPageBtn');
+        const addedCount = document.getElementById('addedCount');
+
+        // Handle Unggah PDF
+        pdfFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function () {
+                pdfBytes = new Uint8Array(this.result);
+                const loadingTask = pdfjsLib.getDocument(pdfBytes);
+                pdfDoc = await loadingTask.promise;
+                pageCount = pdfDoc.numPages;
+                pageNum = 1;
+                placedSignatures = []; // Reset jika ganti PDF baru
+                updateAddedCount();
+
+                placeholder.classList.add('hidden');
+                pdfContainer.classList.remove('hidden');
+                pageControls.classList.remove('hidden');
+
+                await renderPage(pageNum);
+                checkReadyState();
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Handle Unggah Tanda Tangan PNG
+        sigFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function () {
+                signatureDataUrl = this.result;
+                sigImage.src = signatureDataUrl;
+                signatureBox.classList.remove('hidden');
+                checkReadyState();
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Render Halaman PDF ke Canvas
+        async function renderPage(num) {
+            const page = await pdfDoc.getPage(num);
+            const viewport = page.getViewport({ scale: 1.5 }); // Skala tajam
+
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const renderContext = {
+                canvasContext: ctx,
+                viewport: viewport
+            };
+            await page.render(renderContext).promise;
+
+            pageInfo.textContent = `Hal ${num} dari ${pageCount}`;
+
+            // Cek apakah di halaman ini sudah ada TTD yang disematkan sebelumnya, lalu muat posisinya jika ada
+            restoreBoxPositionForCurrentPage();
+        }
+
+        // Navigasi Halaman
+        document.getElementById('prevPage').addEventListener('click', async () => {
+            if (pageNum <= 1) return;
+            saveCurrentPageBoxState(); // simpan posisi sementara sebelum pindah
+            pageNum--;
+            await renderPage(pageNum);
+        });
+
+        document.getElementById('nextPage').addEventListener('click', async () => {
+            if (pageNum >= pageCount) return;
+            saveCurrentPageBoxState(); // simpan posisi sementara sebelum pindah
+            pageNum++;
+            await renderPage(pageNum);
+        });
+
+        // Simpan posisi kotak TTD sementara untuk halaman saat ini
+        let pagePositions = {};
+        function saveCurrentPageBoxState() {
+            pagePositions[pageNum] = {
+                left: signatureBox.style.left,
+                top: signatureBox.style.top,
+                transform: signatureBox.style.transform,
+                width: signatureBox.style.width,
+                height: signatureBox.style.height,
+                dx: signatureBox.getAttribute('data-x') || 0,
+                dy: signatureBox.getAttribute('data-y') || 0
+            };
+        }
+
+        function restoreBoxPositionForCurrentPage() {
+            if (pagePositions[pageNum]) {
+                let p = pagePositions[pageNum];
+                signatureBox.style.left = p.left;
+                signatureBox.style.top = p.top;
+                signatureBox.style.transform = p.transform;
+                signatureBox.style.width = p.width;
+                signatureBox.style.height = p.height;
+                if (p.dx) signatureBox.setAttribute('data-x', p.dx); else signatureBox.removeAttribute('data-x');
+                if (p.dy) signatureBox.setAttribute('data-y', p.dy); else signatureBox.removeAttribute('data-y');
+            } else {
+                signatureBox.style.left = '50px';
+                signatureBox.style.top = '50px';
+                signatureBox.style.transform = 'none';
+                signatureBox.removeAttribute('data-x');
+                signatureBox.removeAttribute('data-y');
+            }
+        }
+
+        // Tombol untuk menyematkan TTD di halaman aktif
+        addSigToPageBtn.addEventListener('click', () => {
+            if (!signatureDataUrl) return;
+
+            // Ambil posisi kotak saat ini
+            const transform = signatureBox.style.transform;
+            let currentX = parseFloat(signatureBox.style.left) || 50;
+            let currentY = parseFloat(signatureBox.style.top) || 50;
+
+            if (transform && transform.includes('translate')) {
+                let match = transform.translate ? null : transform.match(/translate\(([^p]+)px,\s*([^p]+)px\)/);
+                if (match) {
+                    currentX += parseFloat(match[1]);
+                    currentY += parseFloat(match[2]);
+                }
+            }
+
+            // Simpan ke daftar tanda tangan
+            // Cek apakah halaman ini sudah pernah disematkan, jika ya perbarui, jika belum tambahkan
+            let existingIndex = placedSignatures.findIndex(s => s.pageNum === pageNum);
+            let sigData = {
+                pageNum: pageNum,
+                left: currentX,
+                top: currentY,
+                width: signatureBox.offsetWidth,
+                height: signatureBox.offsetHeight
+            };
+
+            if (existingIndex >= 0) {
+                placedSignatures[existingIndex] = sigData;
+            } else {
+                placedSignatures.push(sigData);
+            }
+
+            updateAddedCount();
+            alert(`Tanda tangan berhasil disematkan di Halaman ${pageNum}! Anda bisa pindah halaman untuk menambah TTD lain atau langsung simpan.`);
+        });
+
+        function updateAddedCount() {
+            addedCount.textContent = `Total TTD disematkan: ${placedSignatures.length}`;
+            if (placedSignatures.length > 0 && pdfBytes && signatureDataUrl) {
+                saveBtn.removeAttribute('disabled');
+            } else {
+                saveBtn.setAttribute('disabled', 'true');
+            }
+        }
+
+        // Cek Apakah Siap Disimpan
+        function checkReadyState() {
+            if (pdfBytes && signatureDataUrl) {
+                updateAddedCount();
+            }
+        }
+
+        // Interaksi Geser dan Ubah Ukuran (Interact.js)
+        interact('#signatureBox').draggable({
+            listeners: {
+                move(event) {
+                    const target = event.target;
+                    const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                    const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+                    target.style.transform = `translate(${x}px, ${y}px)`;
+                    target.setAttribute('data-x', x);
+                    target.setAttribute('data-y', y);
+                }
+            }
+        }).resizable({
+            edges: { left: true, right: true, bottom: true, top: true },
+            listeners: {
+                move(event) {
+                    let target = event.target;
+                    let x = (parseFloat(target.getAttribute('data-x')) || 0);
+                    let y = (parseFloat(target.getAttribute('data-y')) || 0);
+
+                    target.style.width = event.rect.width + 'px';
+                    target.style.height = event.rect.height + 'px';
+
+                    x += event.deltaRect.left;
+                    y += event.deltaRect.top;
+
+                    target.style.transform = `translate(${x}px, ${y}px)`;
+                    target.setAttribute('data-x', x);
+                    target.setAttribute('data-y', y);
+                }
+            },
+            modifiers: [
+                interact.modifiers.restrictEdges({
+                    outer: 'parent'
+                }),
+                interact.modifiers.restrictSize({
+                    min: { width: 40, height: 20 }
+                })
+            ],
+            inertia: true
+        });
+
+        // Proses Gabung Semua TTD ke PDF dan Unduh
+        saveBtn.addEventListener('click', async () => {
+            // Pastikan halaman terakhir juga masuk jika belum sempat klik tombol sematkan tapi sudah ada box TTD
+            saveCurrentPageBoxState();
+
+            // Jika user belum sempat klik "Sematkan" di halaman aktif terakhir tapi kotak TTD aktif, masukkan otomatis
+            let currentX = parseFloat(signatureBox.style.left) || 50;
+            let currentY = parseFloat(signatureBox.style.top) || 50;
+            const transform = signatureBox.style.transform;
+            if (transform && transform.includes('translate')) {
+                let match = transform.match(/translate\(([^p]+)px,\s*([^p]+)px\)/);
+                if (match) {
+                    currentX += parseFloat(match[1]);
+                    currentY += parseFloat(match[2]);
+                }
+            }
+
+            if (!placedSignatures.some(s => s.pageNum === pageNum)) {
+                placedSignatures.push({
+                    pageNum: pageNum,
+                    left: currentX,
+                    top: currentY,
+                    width: signatureBox.offsetWidth,
+                    height: signatureBox.offsetHeight
+                });
+            }
+
+            saveBtn.textContent = 'Memproses...';
+            saveBtn.setAttribute('disabled', 'true');
+
+            try {
+                const { PDFDocument } = PDFLib;
+                const pdfDocLib = await PDFDocument.load(pdfBytes);
+                const pages = pdfDocLib.getPages();
+
+                // Embed gambar tanda tangan sekali saja untuk efisiensi
+                let pngImage;
+                if (signatureDataUrl.includes('image/png')) {
+                    pngImage = await pdfDocLib.embedPng(signatureDataUrl);
+                } else {
+                    pngImage = await pdfDocLib.embedJpg(signatureDataUrl);
+                }
+
+                // Loop dan terapkan semua TTD di setiap halaman yang tersimpan
+                for (let sig of placedSignatures) {
+                    const targetPage = pages[sig.pageNum - 1];
+                    const pdfPageWidth = targetPage.getWidth();
+                    const pdfPageHeight = targetPage.getHeight();
+
+                    const scaleX = pdfPageWidth / canvas.width;
+                    const scaleY = pdfPageHeight / canvas.height;
+
+                    const pdfX = sig.left * scaleX;
+                    const pdfY = pdfPageHeight - ((sig.top + sig.height) * scaleY);
+                    const pdfWidth = sig.width * scaleX;
+                    const pdfHeight = sig.height * scaleY;
+
+                    targetPage.drawImage(pngImage, {
+                        x: pdfX,
+                        y: pdfY,
+                        width: pdfWidth,
+                        height: pdfHeight,
+                    });
+                }
+
+                // Simpan dan unduh file hasil
+                const modifiedPdfBytes = await pdfDocLib.save();
+                const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'dokumen-multi-tertandatangani.pdf';
+                link.click();
+
+            } catch (error) {
+                console.error(error);
+                alert('Terjadi kesalahan saat memproses PDF.');
+            } finally {
+                saveBtn.textContent = 'Simpan & Unduh PDF Final';
+                saveBtn.removeAttribute('disabled');
+            }
+        });
+    </script>
+</body>
+
+</html>
